@@ -79,18 +79,27 @@ function renderDocument(document_id) {
     fetch_retry(url, options, attempts)
         .then((document) => {
         console.log('getDocument -> response: ', document)
-        toSidePanel(document)
+        sendDocumentToSidePanel(document)
     })
     .catch((error) => {
         console.log('getDocument -> error: ', error)
         throw error
     })
-        
-    
+}
+
+const renderError = (error) => {
+
+    chrome.runtime.sendMessage({
+        name: 'error-bookmarking',
+        data: error,
+    }).then((response) => {
+        console.log('error-bookmarking response: ', response)
+    })
+
 }
 
 
-async function toSidePanel(document) {
+async function sendDocumentToSidePanel(document) {
     
     // Send message to side panel to render bookmark
     try {
@@ -107,7 +116,7 @@ async function toSidePanel(document) {
 
 async function storeBookmarks(urls) { 
     
-    if (typeof urls === 'string') urls = [urls]
+    if (typeof urls === 'object') urls = [urls]
 
     chrome.storage.local.get(["bookmarks"]).then((value) => {
         let bookmarks = value.bookmarks || [];
@@ -128,7 +137,6 @@ function searchBookmarksByUrl(url) {
     chrome.storage.local.get(["bookmarks"]).then((value) => {
         return value.bookmarks.find(bookmark => bookmark.url === url);
     });
-    
 }
 
 
@@ -160,9 +168,10 @@ chrome.runtime.onMessage.addListener(
             console.log('tabs url: ', request.url)
             postBookmark(request.url).then((result) => {
                 if (result.error) {
-                    console.error('onMessage.bookmark-page error: ', result.error)
+                    console.log('onMessage.bookmark-page error: ', result.error)
+                    renderError(result.error)
                 } else if (!result.error) {
-                    storeBookmarks(result.bookmark.url)
+                    storeBookmarks(result.bookmark)
                     console.log('onMessage.bookmark-page url: ', result.bookmark.url)
                     renderDocument(result.bookmark.document_id)
     
@@ -181,7 +190,14 @@ chrome.runtime.onInstalled.addListener(() => {
         .catch((error) => console.error(error));
     
     // Initialize bookmark local storage
-    refreshBookmarksCache()
+    chrome.storage.local.clear(function() {
+        var error = chrome.runtime.lastError;
+        if (error) {
+            console.error(error);
+        }
+        refreshBookmarksCache()
+    });
+    
 
 }) 
 
