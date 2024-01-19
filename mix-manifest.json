@@ -1,0 +1,8 @@
+{
+    "/dist/js/background.js": "/dist/js/background.js",
+    "/dist/js/utils.js": "/dist/js/utils.js",
+    "/dist/js/sidepanel.js": "/dist/js/sidepanel.js",
+    "/dist/css/sidepanel.css": "/dist/css/sidepanel.css",
+    "/dist/images/icon-128.png": "/dist/images/icon-128.png",
+    "/dist/images/icon-16.png": "/dist/images/icon-16.png"
+}
