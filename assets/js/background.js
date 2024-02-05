@@ -1,17 +1,35 @@
-import { ref } from 'vue'
-
 const base_url = 'http://localhost:8889'
 
 const Endpoints = {
     bookmark: '/bookmark',
-    document: '/bookmark/{ID}/document',
+    document: '/document',
     document_plus: '/document_plus/{ID}',
     user_bookmarks: '/bookmark/user/{ID}'
 }
 
-async function postBookmark(url){
+//Global variables to store current page received from content script. 
+let current_page = null
+
+async function postBookmark(tab){
+    
     let bookmark = null
     let bm_error = null
+    let html = null
+
+    
+    function getTitle() { return document.documentElement.innerHTML; }
+
+    injectionResults = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: false },
+        func: getTitle,
+    });
+
+    if (injectionResults[0].result != null) {
+        console.log('injection results exist')
+        html = injectionResults[0].result
+    }    
+    
+
     try {
         let response = await fetch(`${base_url}${Endpoints.bookmark}`, {
             method: 'post',
@@ -20,7 +38,8 @@ async function postBookmark(url){
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                url: url,
+                url: tab.url,
+                html: html,
             }),
         })
         console.log('response: ', response)
@@ -37,6 +56,32 @@ async function postBookmark(url){
         bm_error = err
         return {bookmark, error: bm_error}
     }
+}
+
+async function postRegenerateDocument(document) {
+
+    console.log('postRegenerateDocument -> document: ', document)
+    //Fetch post with request.document
+    try {
+        let response = await fetch(`${base_url}${Endpoints.document}`, {
+            method: 'post',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(document),
+        })
+        
+        console.log('postRegenerateDocument -> response: ', response)
+        if (response.status == 202) {
+            console.log(`postRegenerateDocument accepted, seding document_ id ${document.id} to renderDocument`)
+            renderDocument(document.id)
+        }
+    }catch (err) {
+        console.log('postRegenerateDocument -> error: ', err)
+    }
+
+    
 }
 
 // Source: https://dev.to/ycmjason/javascript-fetch-retry-upon-failure-3p6g
@@ -58,7 +103,7 @@ function refreshBookmarksCache() {
     const url = `${base_url}${Endpoints.user_bookmarks.replace('{ID}', 777)}`
     const options = { method: 'GET', headers: {'Accept': 'application/json','Content-Type': 'application/json',}}
 
-    
+    console.log('refreshBookmarksCache -> url: ', url)
     fetch_retry(url, options, attempts)
         .then((bookmarks) => {
         console.log('refreshBookmarksCache -> response: ', bookmarks)
@@ -71,15 +116,24 @@ function refreshBookmarksCache() {
 }
 
 function renderDocument(document_id) {
+    /*
+    * Fetch document from server with a retry fetch.
+    * The reason for the retry fetch is that the server may not have the document ready while
+    * LLM is still processing the document.
+    * Send document to side panel to render. 
+    */
     
     let attempts = 3
     const url = `${base_url}${Endpoints.document_plus.replace('{ID}', document_id)}`
     const options = { method: 'GET', headers: {'Accept': 'application/json','Content-Type': 'application/json',}}
 
-    fetch_retry(url, options, attempts)
-        .then((document) => {
-        console.log('getDocument -> response: ', document)
-        sendDocumentToSidePanel(document)
+    console.log('renderDocument -> url: ', url)
+    fetch_retry(url, options, attempts).then((document) => {
+            console.log('getDocument -> response: ', document)
+            sendDocumentToSidePanel(document).then((response) => {          
+                console.log('renderDocument -> response: ', response)
+            })
+            
     })
     .catch((error) => {
         console.log('getDocument -> error: ', error)
@@ -141,13 +195,24 @@ function searchBookmarksByUrl(url) {
 
 
 // Detect changes in active tab
-chrome.tabs.onActivated.addListener(async (activeInfo) => { 
-    console.log('tabs.onActivated', activeInfo.tabId)
-    const { path } = await chrome.sidePanel.getOptions({ tabId: activeInfo.tabId });
-    console.log('tabs.onActivated: ', path)
+chrome.tabs.onActivated.addListener(async (tab) => { 
+
+    console.log('tabs.onActivated', tab.tabId)
+    const { path } = await chrome.sidePanel.getOptions({ tabId: tab.tabId });
+    console.log('tabs.onActivated -> sidepanel exists: ', path)
     chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-        console.log('tabs url: ', tabs[0].url)
+        console.log('tabs onActivated -> query for active tab -> url: ', tabs[0].url)
     });
+
+
+    function getTitle() { return document.title; }
+
+    injectionResults = await chrome.scripting.executeScript({
+        target: { tabId: tab.tabId, allFrames: false },
+        func: getTitle,
+    });
+    console.log('injection results ', injectionResults[0].result)
+
 });
 
 
@@ -157,16 +222,21 @@ chrome.tabs.onUpdated.addListener(function (tabId , info) {
     }
 });
 
+
+
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
         console.log('background.js got message. ', request)    
         
+        if (request.name === 'content-script-loaded') {
+            current_page = request
+        }
         
         if (request.name === 'bookmark-page') {
             console.log('background.js got message. Side Panel Opened')
             
-            console.log('tabs url: ', request.url)
-            postBookmark(request.url).then((result) => {
+            console.log('tabs url: ', request.tab.url)
+            postBookmark(request.tab).then((result) => {
                 if (result.error) {
                     console.log('onMessage.bookmark-page error: ', result.error)
                     renderError(result.error)
@@ -179,6 +249,11 @@ chrome.runtime.onMessage.addListener(
                     console.log('error: ', result)
                 }
             })
+        }
+
+        if (request.name === 'regenerate-document') {
+            console.log('background.js got message. Regenerate Document')
+            postRegenerateDocument(request.document)
         }
     });
 
@@ -195,11 +270,24 @@ chrome.runtime.onInstalled.addListener(() => {
         if (error) {
             console.error(error);
         }
-        refreshBookmarksCache()
+        //refreshBookmarksCache()
     });
     
 
 }) 
+
+
+// To handle youtube video page
+chrome.webNavigation.onHistoryStateUpdated.addListener(function(details) {
+    if(details.frameId === 0) {
+        // Fires only when details.url === currentTab.url
+        chrome.tabs.get(details.tabId, function(tab) {
+            if(tab.url === details.url) {
+                console.log("onHistoryStateUpdated");
+            }
+        });
+    }
+});
 
 
 

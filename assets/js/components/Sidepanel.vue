@@ -1,5 +1,5 @@
 <template>
-    <div v-if = "document">
+    <div v-if = "status === 'Done'">
         <h1 class="title">{{document.title}}</h1>
         <p>{{ document.short_summary }}</p>
         <div v-for="point in document.summary_bullet_points" :key="point">
@@ -8,6 +8,9 @@
     </div>
     <div v-if = "!document && !status">
         <button @click="handleBookmark">Bookmark Page</button>
+    </div>
+    <div v-if = "status == 'Failure'">
+        <button @click="handleRegenerateDocument">Regenerate Document</button>
     </div>
     <div v-if = "status === 'loading'">
         <h3>{{ status }}</h3>
@@ -34,12 +37,25 @@ export default {
             status.value = 'loading'
             let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
                 chrome.runtime.sendMessage({
-                    name: 'bookmark-page', url: tabs[0].url
+                    name: 'bookmark-page', tab: tabs[0]
                 }).then((response) => {
                     console.log('response', response)
                 })
         }
         
+        //Regenerate document
+        const handleRegenerateDocument = async () => {
+            status.value = 'loading'
+            let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+                chrome.runtime.sendMessage({
+                    name: 'regenerate-document', tab: tabs[0], document: document.value
+                }).then((response) => {
+                    console.log('response', response)
+                })
+        }
+
+
+        //Searach chorome storage for bookmarks by url
         const searchBookmarksByUrl = (url, sidepanelopen) => {
             status.value = null
             document.value = null
@@ -96,7 +112,7 @@ export default {
                 console.log('sender', sender)    
                 if (request.name === 'render-document') {
                     document.value = request.data.document
-                    status.value = null
+                    status.value = document.value.status
                     console.log('render document', request.data)
                     sendResponse({ message: 'document recived' })
                 }
@@ -109,7 +125,7 @@ export default {
 
 
         
-        return { document, status, handleBookmark, error_message }
+        return { document, status, handleBookmark, handleRegenerateDocument, error_message }
 
     }
 }
