@@ -1,3 +1,5 @@
+import { cleanUrl }  from './utils.js'
+
 const base_url = 'http://localhost:8889'
 
 const Endpoints = {
@@ -10,6 +12,9 @@ const Endpoints = {
 //Global variables to store current page received from content script. 
 let current_page = null
 
+let sss = cleanUrl('https://www.google.com&4534')
+console.log('cleanUrl: ', sss)
+
 async function postBookmark(tab){
     
     let bookmark = null
@@ -19,15 +24,23 @@ async function postBookmark(tab){
     
     function getTitle() { return document.documentElement.innerHTML; }
 
-    injectionResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id, allFrames: false },
-        func: getTitle,
-    });
 
-    if (injectionResults[0].result != null) {
-        console.log('injection results exist')
-        html = injectionResults[0].result
-    }    
+    try {
+        const injectionResults = await chrome.scripting.executeScript({
+            target: { tabId: tab.id, allFrames: false },
+            func: getTitle,
+        });
+
+        if (injectionResults[0].result != null) {
+            console.log('injection results exist')
+            html = injectionResults[0].result
+        }
+    } catch (error) {
+        //If error, log error and continue without the html
+        console.log('postBookmark error executing script: ', error)
+    }
+    
+   
     
 
     try {
@@ -168,13 +181,13 @@ async function sendDocumentToSidePanel(document) {
 }
 
 
-async function storeBookmarks(urls) { 
+async function storeBookmarks(new_bookmarks) { 
     
-    if (typeof urls === 'object') urls = [urls]
+    if (typeof new_bookmarks === 'object') new_bookmarks = [new_bookmarks]
 
     chrome.storage.local.get(["bookmarks"]).then((value) => {
         let bookmarks = value.bookmarks || [];
-        bookmarks = Array.from(new Set([...bookmarks, ...urls]));
+        bookmarks = Array.from(new Set([...bookmarks, ...new_bookmarks]));
         chrome.storage.local.set({ bookmarks: bookmarks }).then(() => {
             console.log("Bookmarks storage updated");
         });
@@ -203,16 +216,6 @@ chrome.tabs.onActivated.addListener(async (tab) => {
     chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
         console.log('tabs onActivated -> query for active tab -> url: ', tabs[0].url)
     });
-
-
-    function getTitle() { return document.title; }
-
-    injectionResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.tabId, allFrames: false },
-        func: getTitle,
-    });
-    console.log('injection results ', injectionResults[0].result)
-
 });
 
 
@@ -228,10 +231,7 @@ chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
         console.log('background.js got message. ', request)    
         
-        if (request.name === 'content-script-loaded') {
-            current_page = request
-        }
-        
+        // Handle message from sipde panel
         if (request.name === 'bookmark-page') {
             console.log('background.js got message. Side Panel Opened')
             
@@ -255,6 +255,11 @@ chrome.runtime.onMessage.addListener(
             console.log('background.js got message. Regenerate Document')
             postRegenerateDocument(request.document)
         }
+
+        if (request.name === 'request-document') {
+            console.log('background.js got message. Request Document')
+            renderDocument(request.bookmark.document_id)
+        }
     });
 
 
@@ -270,7 +275,7 @@ chrome.runtime.onInstalled.addListener(() => {
         if (error) {
             console.error(error);
         }
-        //refreshBookmarksCache()
+        refreshBookmarksCache()
     });
     
 
@@ -288,9 +293,5 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(function(details) {
         });
     }
 });
-
-
-
-
 
 
