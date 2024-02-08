@@ -1,4 +1,5 @@
-import { cleanUrl }  from './utils.js'
+import { cleanUrl } from './utils.js'
+import { firebase } from './firebase/config'
 
 const base_url = 'http://localhost:8889'
 
@@ -9,11 +10,26 @@ const Endpoints = {
     user_bookmarks: '/bookmark/user/{ID}'
 }
 
-//Global variables to store current page received from content script. 
-let current_page = null
 
-let sss = cleanUrl('https://www.google.com&4534')
-console.log('cleanUrl: ', sss)
+// Authenticating user with Google 
+chrome.identity.getAuthToken({ interactive: true }, token =>
+    {
+      if ( chrome.runtime.lastError || ! token ) {
+        alert(`SSO ended with an error: ${JSON.stringify(chrome.runtime.lastError)}`)
+        return
+      }
+    signInWithCredential(auth, GoogleAuthProvider.credential(null, token))
+        .then(res =>
+        {
+          console.log('signed in!')
+        })
+        .catch(err =>
+        {
+          alert(`SSO ended with an error: ${err}`)
+        })
+    })
+
+
 
 async function postBookmark(tab){
     

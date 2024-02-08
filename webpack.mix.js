@@ -1,7 +1,6 @@
 let mix = require('laravel-mix');
 const webpack = require('webpack')
 
-
 mix.setPublicPath('./')
     .css('assets/css/sidepanel.css', 'dist/css')
     .copy('assets/images', 'dist/images')
