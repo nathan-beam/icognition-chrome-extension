@@ -1,27 +1,35 @@
 <template>
     <div class="container">
         <div class="debug">
-            <p> the status is: {{ status }} and document is: {{ document !== null}}</p>
+            <p> the status is: {{ doc_status }} and document is: {{ document !== null}} server status {{  server_status }}</p>
         </div>
-        <div v-if = "status === 'Done'">
+
+        <div v-if="server_status === 'up'">
+            <div v-if = "doc_status === 'Done'">
             <h1 class="title">{{document.title}}</h1>
             <p>{{ document.short_summary }}</p>
             <div v-for="point in document.summary_bullet_points" :key="point">
                 <p>{{ point }}</p>
             </div>
+            </div>
+            <div v-if = "!document && !doc_status">
+                <button @click="handleBookmark">Bookmark Page</button>
+            </div>
+            <div v-if = "doc_status == 'Failure'">
+                <button @click="handleRegenerateDocument">Regenerate Document</button>
+            </div>
+            <div v-if = "doc_status === 'loading'">
+                <h3>{{ doc_status }}</h3>
+            </div>
+            <div v-if = "doc_status === 'error'">
+                <h3>{{ error_message }}</h3>
+            </div>
+            </div>
+        <div v-if="server_status === 'down'">
+            <h3>Server is down</h3>
         </div>
-        <div v-if = "!document && !status">
-            <button @click="handleBookmark">Bookmark Page</button>
-        </div>
-        <div v-if = "status == 'Failure'">
-            <button @click="handleRegenerateDocument">Regenerate Document</button>
-        </div>
-        <div v-if = "status === 'loading'">
-            <h3>{{ status }}</h3>
-        </div>
-        <div v-if = "status === 'error'">
-            <h3>{{ error_message }}</h3>
-        </div>
+
+        
     </div>
 </template>
 <script>
@@ -31,14 +39,15 @@ export default {
                 
     setup() {
 
-        const status = ref(null)
+        const doc_status = ref(null)
         const document = ref(null)
         const error_message = ref(null)
+        const server_status = ref(null)
 
 
         //Methods to handle events
         const handleBookmark = async () => {
-            status.value = 'loading'
+            doc_status.value = 'loading'
             let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
 
             chrome.runtime.sendMessage({
@@ -50,7 +59,7 @@ export default {
 
         // Request document from the server
         const handleRequestDocument = async (bookmark_obj) => {
-            status.value = 'loading'
+            doc_status.value = 'loading'
             
             chrome.runtime.sendMessage({
                 name: 'request-document', bookmark: bookmark_obj
@@ -62,7 +71,7 @@ export default {
 
         //Regenerate document
         const handleRegenerateDocument = async () => {
-            status.value = 'loading'
+            doc_status.value = 'loading'
             let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
                 chrome.runtime.sendMessage({
                     name: 'regenerate-document', tab: tabs[0], document: document.value
@@ -74,7 +83,7 @@ export default {
 
         //Searach chorome storage for bookmarks by url
         const searchBookmarksByUrl = (tab, sidepanelopen) => {
-            status.value = null
+            doc_status.value = null
             document.value = null
             chrome.storage.local.get(["bookmarks"]).then((value) => {
 
@@ -83,8 +92,8 @@ export default {
                     console.log('searchBookmarksByUrl -> bookmarks is empty')
                     return
                 }
-                console.log('searchBookmarksByUrl -> tab:', tab)
                 const url = cleanUrl(tab.url)
+                console.log('searchBookmarksByUrl -> url:', url)
                 const exist = value.bookmarks[0].find(bookmark => bookmark.url === url)
 
                 if (exist) {
@@ -108,6 +117,12 @@ export default {
             searchBookmarksByUrl(tabs[0], true)
         });
 
+
+        // Send message to background.js asking if server is running
+        chrome.runtime.sendMessage({ name: 'server-is' }).then((response) => {
+            console.log('Sidepanel -> server-is', response)
+            server_status.value = response.status
+        })
         
 
         
@@ -136,21 +151,21 @@ export default {
                 
                 if (request.name === 'render-document') {
                     document.value = request.data.document
-                    status.value = document.value.status
+                    doc_status.value = document.value.status
                     console.log('render document', request.data)
                     sendResponse({ message: 'document recived' })
                 }
                 if (request.name === 'error-bookmarking') {
                     console.log('error-bookmarking -> request', request)
                     console.log('error-bookmarking -> request', document.value)
-                    status.value = 'error'
+                    doc_status.value = 'error'
                     document.value = null
                     error_message.value = request.data
                     sendResponse({ message: 'bookmark-page recived' })
                 }
         }); 
        
-        return { document, status, handleBookmark, handleRegenerateDocument, error_message }
+        return { document, doc_status: doc_status, handleBookmark, handleRegenerateDocument, error_message, server_status }
 
     }
 }

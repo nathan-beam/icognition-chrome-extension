@@ -12,9 +12,6 @@ const Endpoints = {
 //Global variables to store current page received from content script. 
 let current_page = null
 
-let sss = cleanUrl('https://www.google.com&4534')
-console.log('cleanUrl: ', sss)
-
 async function postBookmark(tab){
     
     let bookmark = null
@@ -226,11 +223,28 @@ chrome.tabs.onUpdated.addListener(function (tabId , info) {
 });
 
 
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => { 
+    if (request.name === 'server-is') {
+        console.log('background.js got message. Server is')
+        fetch_retry(`${base_url}/ping`, { method: 'GET', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', } }, 3)
+            .then((response) => {
+                sendResponse({ status: 'up' })
+            
+            }).catch((error) => {
+                sendResponse({ status: 'down' })
+            })
+    
+    }
+    return true
+
+});
+
+
 
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
         console.log('background.js got message. ', request)    
-        
+
         // Handle message from sipde panel
         if (request.name === 'bookmark-page') {
             console.log('background.js got message. Side Panel Opened')
@@ -279,19 +293,6 @@ chrome.runtime.onInstalled.addListener(() => {
     });
     
 
-}) 
-
-
-// To handle youtube video page
-chrome.webNavigation.onHistoryStateUpdated.addListener(function(details) {
-    if(details.frameId === 0) {
-        // Fires only when details.url === currentTab.url
-        chrome.tabs.get(details.tabId, function(tab) {
-            if(tab.url === details.url) {
-                console.log("onHistoryStateUpdated");
-            }
-        });
-    }
-});
+})
 
 
