@@ -11,26 +11,6 @@ const Endpoints = {
 }
 
 
-// Authenticating user with Google 
-chrome.identity.getAuthToken({ interactive: true }, token =>
-    {
-      if ( chrome.runtime.lastError || ! token ) {
-        alert(`SSO ended with an error: ${JSON.stringify(chrome.runtime.lastError)}`)
-        return
-      }
-    signInWithCredential(auth, GoogleAuthProvider.credential(null, token))
-        .then(res =>
-        {
-          console.log('signed in!')
-        })
-        .catch(err =>
-        {
-          alert(`SSO ended with an error: ${err}`)
-        })
-    })
-
-
-
 async function postBookmark(tab){
     
     let bookmark = null
@@ -296,18 +276,3 @@ chrome.runtime.onInstalled.addListener(() => {
     
 
 }) 
-
-
-// To handle youtube video page
-chrome.webNavigation.onHistoryStateUpdated.addListener(function(details) {
-    if(details.frameId === 0) {
-        // Fires only when details.url === currentTab.url
-        chrome.tabs.get(details.tabId, function(tab) {
-            if(tab.url === details.url) {
-                console.log("onHistoryStateUpdated");
-            }
-        });
-    }
-});
-
-

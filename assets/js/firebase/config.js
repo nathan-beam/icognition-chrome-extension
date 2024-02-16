@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
-import firebase from 'firebase/compat/app';
-import * as firebaseui from 'firebaseui'
+import { initializeApp } from 'firebase/app';
+import { getAuth, signOut, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -11,8 +11,8 @@ const firebaseConfig = {
     messagingSenderId: "458477770208",
     appId: "1:458477770208:web:cf43ba4d23eb6c91d54785"
 };
+
+const firebase = initializeApp(firebaseConfig);
+const auth = getAuth(firebase);
   
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-//console.log('firebase initialized. Env variable: ', process.env.MIX_API_KEY)  
-export { firebase, firebaseui }
+export { firebase, auth, signOut, GoogleAuthProvider, signInWithCredential}

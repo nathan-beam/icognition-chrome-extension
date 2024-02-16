@@ -1,8 +1,18 @@
 <template>
     <div class="container">
-        <div class="debug">
-            <p> the status is: {{ status }} and document is: {{ document !== null}}</p>
+        <div class="controls">
+            <div v-if="user === null" class="auth">
+                <label class="btn"  @click="signIn">Sign to Google</label>
+            </div>
+
+            <div v-else class="bookmark_button" >
+                <label class="btn" v-if = "!document" @click="handleBookmark">Save</label>
+                <label class="btn" v-if = "status == 'Done'" @click="handleRegenerateDocument">Regenerate</label>
+                <label class="btn" v-if = "status == 'Failure'" @click="handleRegenerateDocument">Regenerate</label>
+                <label class="btn" v-if="user !== null" @click="signOut">{{ user.displayName }}</label>
+            </div>
         </div>
+        
         <div v-if = "status === 'Done'">
             <h1 class="title">{{document.title}}</h1>
             <p>{{ document.short_summary }}</p>
@@ -10,23 +20,22 @@
                 <p>{{ point }}</p>
             </div>
         </div>
-        <div v-if = "!document && !status">
-            <button @click="handleBookmark">Bookmark Page</button>
-        </div>
-        <div v-if = "status == 'Failure'">
-            <button @click="handleRegenerateDocument">Regenerate Document</button>
-        </div>
-        <div v-if = "status === 'loading'">
-            <h3>{{ status }}</h3>
-        </div>
-        <div v-if = "status === 'error'">
-            <h3>{{ error_message }}</h3>
+
+        <div class="debug">
+            <p> the status is: {{ status }} and document is: {{ document !== null}}</p>
+            <div v-if = "status === 'loading'">
+                <h3>{{ status }}</h3>
+            </div>
+            <div v-if = "status === 'error'">
+                <h3>{{ error_message }}</h3>
+            </div>
         </div>
     </div>
 </template>
 <script>
 import { ref, onMounted } from 'vue'
 import { cleanUrl } from '../utils.js'
+import { firebase, auth, signOut, signInWithCredential, GoogleAuthProvider } from '../firebase/config'
 export default {
                 
     setup() {
@@ -34,6 +43,42 @@ export default {
         const status = ref(null)
         const document = ref(null)
         const error_message = ref(null)
+        const user = ref(null)
+
+
+        const signIn = function(e) {
+            e.preventDefault()
+            console.log('before signed in user -> ', auth.currentUser)
+            chrome.identity.getAuthToken({ interactive: true }, token =>
+            {
+            if ( chrome.runtime.lastError || ! token ) {
+                console.log(`SSO ended with an error: ${JSON.stringify(chrome.runtime.lastError)}`)
+                return
+            }
+
+            signInWithCredential(auth, GoogleAuthProvider.credential(null, token))
+                .then(res =>
+                {
+                    user.value = auth.currentUser
+                    console.log('signed in user -> ', auth.currentUser)
+                })
+                .catch(err =>
+                {
+                console.log(`SSO ended with an error: ${err}`)
+                })
+            })
+        }
+
+        const signOut = function () {
+            
+            auth.signOut().then(() => {
+                console.log('signed out! user: ', auth.currentUser)
+                user.value = null
+            }).catch((error) => {
+            console.error('error signing out: ', error)
+            });
+        }
+
 
 
         //Methods to handle events
@@ -150,19 +195,8 @@ export default {
                 }
         }); 
        
-        return { document, status, handleBookmark, handleRegenerateDocument, error_message }
+        return { document, status, handleBookmark, handleRegenerateDocument, error_message, signIn, signOut, user}
 
     }
 }
 </script>
-<style>
-    .container {
-        padding: 20px;
-    }
-
-    .debug {
-        background-color: #f4f4f4;
-        padding: 10px;
-        margin-bottom: 20px;
-    }
-</style>
