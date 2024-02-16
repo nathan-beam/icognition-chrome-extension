@@ -38,3 +38,34 @@ button {
     border: 1px solid grey;
     border-radius: 5px; /* Add this line to make the button border corners round */
 }
+
+.controls {
+    padding: 20px;
+    display: flex;
+}
+.auth {
+    margin: auto;
+    margin-left: 80px;
+}
+.bookmark_button {
+    padding: 10px;
+    margin-left: 10px;
+}
+.debug {
+    background-color: #f4f4f4;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+label.btn {
+    padding: 0 0.50em;
+    border: 1px solid #666;
+    border-radius: 0.20em;
+    background-color: #e3e3e3;
+    font-size: 16px;
+}
+label.btn:hover {
+    border: 2px solid #666;
+    border-radius: 0.20em;
+    background-color: #d4d4d4; 
+}

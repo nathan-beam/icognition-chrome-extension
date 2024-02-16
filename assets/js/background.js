@@ -1,4 +1,5 @@
-import { cleanUrl }  from './utils.js'
+import { cleanUrl } from './utils.js'
+import { firebase } from './firebase/config'
 
 const base_url = 'http://localhost:8889'
 
@@ -9,8 +10,11 @@ const Endpoints = {
     user_bookmarks: '/bookmark/user/{ID}'
 }
 
+<<<<<<< HEAD
 //Global variables to store current page received from content script. 
 let current_page = null
+=======
+>>>>>>> add_auth
 
 async function postBookmark(tab){
     
@@ -293,6 +297,10 @@ chrome.runtime.onInstalled.addListener(() => {
     });
     
 
+<<<<<<< HEAD
 })
 
 
+=======
+}) 
+>>>>>>> add_auth

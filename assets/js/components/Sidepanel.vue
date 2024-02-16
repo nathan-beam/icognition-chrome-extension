@@ -1,11 +1,28 @@
 <template>
     <div class="container">
+<<<<<<< HEAD
         <div class="debug">
             <p> the status is: {{ doc_status }} and document is: {{ document !== null}} server status {{  server_status }}</p>
         </div>
 
         <div v-if="server_status === 'up'">
             <div v-if = "doc_status === 'Done'">
+=======
+        <div class="controls">
+            <div v-if="user === null" class="auth">
+                <label class="btn"  @click="signIn">Sign to Google</label>
+            </div>
+
+            <div v-else class="bookmark_button" >
+                <label class="btn" v-if = "!document" @click="handleBookmark">Save</label>
+                <label class="btn" v-if = "status == 'Done'" @click="handleRegenerateDocument">Regenerate</label>
+                <label class="btn" v-if = "status == 'Failure'" @click="handleRegenerateDocument">Regenerate</label>
+                <label class="btn" v-if="user !== null" @click="signOut">{{ user.displayName }}</label>
+            </div>
+        </div>
+        
+        <div v-if = "status === 'Done'">
+>>>>>>> add_auth
             <h1 class="title">{{document.title}}</h1>
             <p>{{ document.short_summary }}</p>
             <div v-for="point in document.summary_bullet_points" :key="point">
@@ -29,12 +46,25 @@
             <h3>Server is down</h3>
         </div>
 
+<<<<<<< HEAD
         
+=======
+        <div class="debug">
+            <p> the status is: {{ status }} and document is: {{ document !== null}}</p>
+            <div v-if = "status === 'loading'">
+                <h3>{{ status }}</h3>
+            </div>
+            <div v-if = "status === 'error'">
+                <h3>{{ error_message }}</h3>
+            </div>
+        </div>
+>>>>>>> add_auth
     </div>
 </template>
 <script>
 import { ref, onMounted } from 'vue'
 import { cleanUrl } from '../utils.js'
+import { firebase, auth, signOut, signInWithCredential, GoogleAuthProvider } from '../firebase/config'
 export default {
                 
     setup() {
@@ -42,7 +72,46 @@ export default {
         const doc_status = ref(null)
         const document = ref(null)
         const error_message = ref(null)
+<<<<<<< HEAD
         const server_status = ref(null)
+=======
+        const user = ref(null)
+
+
+        const signIn = function(e) {
+            e.preventDefault()
+            console.log('before signed in user -> ', auth.currentUser)
+            chrome.identity.getAuthToken({ interactive: true }, token =>
+            {
+            if ( chrome.runtime.lastError || ! token ) {
+                console.log(`SSO ended with an error: ${JSON.stringify(chrome.runtime.lastError)}`)
+                return
+            }
+
+            signInWithCredential(auth, GoogleAuthProvider.credential(null, token))
+                .then(res =>
+                {
+                    user.value = auth.currentUser
+                    console.log('signed in user -> ', auth.currentUser)
+                })
+                .catch(err =>
+                {
+                console.log(`SSO ended with an error: ${err}`)
+                })
+            })
+        }
+
+        const signOut = function () {
+            
+            auth.signOut().then(() => {
+                console.log('signed out! user: ', auth.currentUser)
+                user.value = null
+            }).catch((error) => {
+            console.error('error signing out: ', error)
+            });
+        }
+
+>>>>>>> add_auth
 
 
         //Methods to handle events
@@ -165,19 +234,12 @@ export default {
                 }
         }); 
        
+<<<<<<< HEAD
         return { document, doc_status: doc_status, handleBookmark, handleRegenerateDocument, error_message, server_status }
+=======
+        return { document, status, handleBookmark, handleRegenerateDocument, error_message, signIn, signOut, user}
+>>>>>>> add_auth
 
     }
 }
 </script>
-<style>
-    .container {
-        padding: 20px;
-    }
-
-    .debug {
-        background-color: #f4f4f4;
-        padding: 10px;
-        margin-bottom: 20px;
-    }
-</style>
