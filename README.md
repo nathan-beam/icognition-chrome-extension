@@ -20,3 +20,11 @@ NOTE: This example only defines the word extensions and popup.
 You should see the definition on the side panel
 
 <img src="https://wd.imgix.net/image/BhuKGJaIeLNPW9ehns59NfwqKxF2/aC3zkJDPliNLXdvfugeU.png" alt="Dictionary extension context menu">
+
+
+
+## Chrome Developer Dashboard
+1. https://chrome.google.com/webstore/developer/dashboard 
+2. Register as non-trade for now
+
+Icons link: <a target="_blank" href="https://icons8.com/icon/AqxR8HVzKNDb/info">Info</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a>

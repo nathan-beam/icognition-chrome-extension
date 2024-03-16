@@ -9,12 +9,8 @@ const Endpoints = {
     document_plus: '/document_plus/{ID}',
     user_bookmarks: '/bookmark/user/{ID}'
 }
-
-<<<<<<< HEAD
 //Global variables to store current page received from content script. 
 let current_page = null
-=======
->>>>>>> add_auth
 
 async function postBookmark(tab){
     
@@ -23,13 +19,13 @@ async function postBookmark(tab){
     let html = null
 
     
-    function getTitle() { return document.documentElement.innerHTML; }
+    function getBody() { return document.documentElement.innerHTML; }
 
 
     try {
         const injectionResults = await chrome.scripting.executeScript({
             target: { tabId: tab.id, allFrames: false },
-            func: getTitle,
+            func: getBody,
         });
 
         if (injectionResults[0].result != null) {
@@ -192,7 +188,7 @@ async function storeBookmarks(new_bookmarks) {
         chrome.storage.local.set({ bookmarks: bookmarks }).then(() => {
             console.log("Bookmarks storage updated");
         });
-    });
+    });  // chrome.storage.local.set({ 'https://www.thecurrent.com/what-the-tech-open-internet': 'something to store'})
 }
 
 async function getLocalBookmarks() { 
@@ -227,28 +223,11 @@ chrome.tabs.onUpdated.addListener(function (tabId , info) {
 });
 
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => { 
-    if (request.name === 'server-is') {
-        console.log('background.js got message. Server is')
-        fetch_retry(`${base_url}/ping`, { method: 'GET', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', } }, 3)
-            .then((response) => {
-                sendResponse({ status: 'up' })
-            
-            }).catch((error) => {
-                sendResponse({ status: 'down' })
-            })
-    
-    }
-    return true
-
-});
-
-
 
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
         console.log('background.js got message. ', request)    
-
+        
         // Handle message from sipde panel
         if (request.name === 'bookmark-page') {
             console.log('background.js got message. Side Panel Opened')
@@ -297,10 +276,4 @@ chrome.runtime.onInstalled.addListener(() => {
     });
     
 
-<<<<<<< HEAD
-})
-
-
-=======
 }) 
->>>>>>> add_auth

@@ -4,5 +4,10 @@
     "/dist/js/sidepanel.js": "/dist/js/sidepanel.js",
     "/dist/css/sidepanel.css": "/dist/css/sidepanel.css",
     "/dist/images/icon-128.png": "/dist/images/icon-128.png",
-    "/dist/images/icon-16.png": "/dist/images/icon-16.png"
+    "/dist/images/icon-16.png": "/dist/images/icon-16.png",
+    "/dist/images/icon-info-16-2.png": "/dist/images/icon-info-16-2.png",
+    "/dist/images/icons8-info-100.png": "/dist/images/icons8-info-100.png",
+    "/dist/images/icons8-info-128.png": "/dist/images/icons8-info-128.png",
+    "/dist/images/icons8-info-16-blue.png": "/dist/images/icons8-info-16-blue.png",
+    "/dist/images/icons8-info-64.png": "/dist/images/icons8-info-64.png"
 }
