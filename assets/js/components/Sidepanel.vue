@@ -46,6 +46,13 @@ export default {
         const server_status = ref(null)
 
 
+        // Send message to background.js asking if server is running
+        chrome.runtime.sendMessage({ name: 'server-is' }).then((response) => {
+            console.log('Sidepanel -> server-is', response)
+            server_status.value = response.status
+        })
+
+
         //Methods to handle events
         const handleBookmark = async () => {
             doc_status.value = 'loading'
@@ -114,17 +121,12 @@ export default {
         // On sidepanel open, find the current tab and search for bookmarks.
         // If bookmark found, show the document, less create a new bookmark
         chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-            console.log('Sidepanel -> tabs.query', tabs[0].url)
-            searchBookmarksByUrl(tabs[0], true)
+            
+            url = cleanUrl(tabs[0].url)
+            console.log('Sidepanel -> tabs.query', turl)
+            searchBookmarksByUrl(url, true)
         });
 
-
-        // Send message to background.js asking if server is running
-        chrome.runtime.sendMessage({ name: 'server-is' }).then((response) => {
-            console.log('Sidepanel -> server-is', response)
-            server_status.value = response.status
-        })
-        
 
         
         // Detect changes in active tab and navigation between tabs

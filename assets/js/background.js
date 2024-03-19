@@ -4,6 +4,7 @@ import { firebase } from './firebase/config'
 const base_url = 'http://localhost:8889'
 
 const Endpoints = {
+    ping: '/ping',
     bookmark: '/bookmark',
     document: '/document',
     document_plus: '/document_plus/{ID}',
@@ -177,16 +178,16 @@ async function sendDocumentToSidePanel(document) {
     }
 }
 
-
+ 
 async function storeBookmarks(new_bookmarks) { 
     
     if (typeof new_bookmarks === 'object') new_bookmarks = [new_bookmarks]
-
+    console.log('storeBookmarks -> new_bookmarks: ', new_bookmarks)
     chrome.storage.local.get(["bookmarks"]).then((value) => {
-        let bookmarks = value.bookmarks || [];
-        bookmarks = Array.from(new Set([...bookmarks, ...new_bookmarks]));
-        chrome.storage.local.set({ bookmarks: bookmarks }).then(() => {
-            console.log("Bookmarks storage updated");
+        let bkmks = value.bookmarks || [];
+        bkmks = Array.from(new Set([...bookmarks, ...new_bookmarks]));
+        chrome.storage.local.set({ bookmarks: bkmks }).then(() => {
+            console.log("Bookmarks storage updated", bkmks);
         });
     });  // chrome.storage.local.set({ 'https://www.thecurrent.com/what-the-tech-open-internet': 'something to store'})
 }
@@ -224,9 +225,26 @@ chrome.tabs.onUpdated.addListener(function (tabId , info) {
 
 
 
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => { 
+    if (request.name === 'server-is') {
+        console.log('background.js got message. Server is')
+        fetch_retry(`${base_url}/ping`, { method: 'GET', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', } }, 3)
+            .then((response) => {
+                sendResponse({ status: 'up' })
+
+            }).catch((error) => {
+                sendResponse({ status: 'down' })
+            })
+
+    }
+    return true
+});
+
+
+
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
-        console.log('background.js got message. ', request)    
+        console.log('background.js got message. request: ', request, ' sender: ', sender)    
         
         // Handle message from sipde panel
         if (request.name === 'bookmark-page') {
