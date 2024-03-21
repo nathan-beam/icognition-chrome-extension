@@ -1,7 +1,20 @@
 body {
     background: white;
+    font-family: Monospace, Arial, Helvetica, sans-serif;
+	font-size: 13px;
 }
 
+.container {
+    width:100%;
+    display: flex;
+    justify-content: center;
+}
+
+.controls {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+}
 textarea {
     resize: none;
 }
@@ -33,39 +46,115 @@ button {
     position: absolute;
     top: 0;
     right: 25px;
-    font-size: 36px !important;
+    font-size: 12px !important;
     margin-left: 50px;
     border: 1px solid grey;
     border-radius: 5px; /* Add this line to make the button border corners round */
 }
 
-.controls {
-    padding: 20px;
-    display: flex;
-}
+
 .auth {
     margin: auto;
     margin-left: 80px;
 }
-.bookmark_button {
-    padding: 10px;
-    margin-left: 10px;
-}
+
 .debug {
     background-color: #f4f4f4;
     padding: 10px;
     margin-bottom: 20px;
 }
 
+.button_container {
+    padding: 5px 5px 5px 1px;
+    margin-left: 5px;
+    display: flex;
+    justify-content: center;
+    width: 250px;
+
+}
 label.btn {
-    padding: 0 0.50em;
+    width: 100%;
+    padding: 5px 25px 5px 25px;
     border: 1px solid #666;
     border-radius: 0.20em;
-    background-color: #e3e3e3;
+    background-color: #95d8f3;
     font-size: 16px;
+    text-align: center;
 }
 label.btn:hover {
-    border: 2px solid #666;
+    border: 1px solid #666;
     border-radius: 0.20em;
-    background-color: #d4d4d4; 
+    background-color: #00a6e6; 
 }
+
+.logout_icon {
+    position: absolute;
+    top: 8px;
+    right: 16px;
+    font-size: 30px;
+}
+
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+.answer, .info, .success, .warning, .error, .validation {
+    border: 0.5px solid;
+    margin: 10px 0px;
+    padding: 15px 10px 15px 15px;
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    border-radius: 10px;
+}
+.answer_contrainer {
+    padding: 2px 2px 2px 2px;
+}
+.answer-item {
+    padding: 2px 2px 5px 5px;
+}
+.answer {
+    font-family: 'Courier New', Courier, monospace;
+    color: #2f3133;
+    background-color: #e1e2e3;
+    font-size: 16px;
+    padding: 5px;
+}
+.answer_title {
+    padding: 0.5px 2px 1px 10px;
+    text-decoration: underline;
+}
+.info {
+    color: #00529B;
+    background-color: #BDE5F8;
+}
+.success {
+    color: #4F8A10;
+    background-color: #DFF2BF;
+}
+.warning {
+    color: #9F6000;
+    background-color: #FEEFB3;
+}
+.error{
+    color: #D8000C;
+    background-color: #FFBABA;
+}
+.validation{
+    color: #D63301;
+    background-color: #FFCCBA;
+}
+
+.loader {
+    border: 16px solid #f3f3f3; /* Light grey */
+    border-top: 16px solid #3498db; /* Blue */
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    animation: spin 2s linear infinite;
+    margin: auto;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }

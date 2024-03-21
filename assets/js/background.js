@@ -19,7 +19,17 @@ async function postBookmark(tab){
     let bm_error = null
     let html = null
 
-    
+
+    const session_user = await chrome.storage.session.get(["session_user"])
+    console.log('postBookmark -> user: ', session_user.session_user)
+
+
+    //If no authproof, return error
+    if (!session_user.session_user) {
+        bm_error = 'User not authenticated'
+        return {bookmark, error: bm_error}
+    }
+
     function getBody() { return document.documentElement.innerHTML; }
 
 
@@ -50,7 +60,8 @@ async function postBookmark(tab){
             },
             body: JSON.stringify({
                 url: tab.url,
-                html: html,
+                html: html, 
+                user_id: session_user.session_user.uid
             }),
         })
         console.log('response: ', response)
@@ -185,7 +196,7 @@ async function storeBookmarks(new_bookmarks) {
     console.log('storeBookmarks -> new_bookmarks: ', new_bookmarks)
     chrome.storage.local.get(["bookmarks"]).then((value) => {
         let bkmks = value.bookmarks || [];
-        bkmks = Array.from(new Set([...bookmarks, ...new_bookmarks]));
+        bkmks = Array.from(new Set([...bkmks, ...new_bookmarks]));
         chrome.storage.local.set({ bookmarks: bkmks }).then(() => {
             console.log("Bookmarks storage updated", bkmks);
         });

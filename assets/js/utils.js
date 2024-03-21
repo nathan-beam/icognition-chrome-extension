@@ -12,6 +12,10 @@ async function getStoreBookmarks() {
     });
 }
 
+export function caspitalFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
 
 export function cleanUrl(url) {
     url = decodeURIComponent(url);
