@@ -1,0 +1,32 @@
+{
+  "name": "iCogntion",
+  "version": "0.1",
+  "manifest_version": 3,
+  "key": "CHROME_EXTENSION_ID",
+  "description": "Provides TLDR and other information about articles in sidepanel.",
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "action": {
+    "default_title": "icogntion.ai",
+    "default_icon": {
+      "128": "images/icog_action_icon_128x128.png",
+      "16": "images/icog_action_icon_32x32.png"
+    }
+  },
+  "icons": {
+    "128": "images/icog_action_icon_128x128.png",
+    "16": "images/icog_action_icon_32x32.png"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "permissions": ["sidePanel", "tabs", "storage", "identity", "scripting", "activeTab"],
+  "host_permissions": [ "http://*/*", "https://*/*", "<all_urls>" ],
+  "oauth2": {
+    "client_id": "458477770208-s4t57ltqqee97sc2qmge7krf4dnln2e9.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email"
+    ]
+  } 
+}
