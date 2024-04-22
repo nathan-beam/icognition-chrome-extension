@@ -17,9 +17,9 @@
             </div>
 
             <div v-else class="button_container" >
-                <label class="btn" v-if = "!document" @click="handleBookmark">Analyze Page</label>
+                <label class="btn" v-if = "!document" @click="handleBookmark">Bookmark</label>
                 <label class="btn" v-if = "doc_status == 'Done'" @click="handleRegenerateDocument">Regenerate</label>
-                <label class="btn" v-if = "doc_status == 'Failure'" @click="handleRegenerateDocument">Regenerate</label>       
+                <label class="btn" v-if = "doc_status.includes('Failure')" @click="handleRegenerateDocument">Regenerate</label>       
             </div>
         </div>
 
@@ -29,29 +29,16 @@
         </div>
 
         <div v-if = "doc_status === 'Done' && user !== null">
-            <h1 class="title">{{document.title}}</h1>
-        
-            
             <div class="answer_container">
-                <h3 class="answer_title">TLDRs</h3>
+                <h3 class="title">About: <u>{{document.is_about}}</u></h3>
+                <h4 class="title">The key points are:</h4>
                 <div class="answer">
-                    <div class="answer-item" v-for="point in document.summary_bullet_points" :key="point">
+                    <div class="answer-item" v-for="point in document.tldr">
                         {{ point }}
                     </div>
                 </div>  
             </div>
             
-            <div class="answer_container">
-                <h3 class="answer_title">Entities, Concepts and Ideas:</h3>
-                <div class="answer">
-                    <div class="answer-item" v-for="entity in entities" :key="point">
-                        <li>{{ caspitalFirstLetter(entity.name) }} ({{  entity.type }}) - {{  entity.description }}</li>
-                    </div>
-                    <div class="answer-item" v-for="concept in concepts" :key="point">
-                        <li>{{ caspitalFirstLetter(concept.name) }} - {{  concept.description }}</li>
-                    </div>
-                </div>
-            </div>
         </div>
 
 
@@ -69,17 +56,17 @@
 import { ref, onMounted } from 'vue'
 import { cleanUrl, caspitalFirstLetter } from '../utils.js'
 import { firebase, auth, signOut, signInWithCredential, GoogleAuthProvider } from '../firebase/config'
+import { error } from 'laravel-mix/src/Log.js'
 export default {
                 
     setup() {
 
-        const doc_status = ref(null)
+        const doc_status = ref('Placeholder')
         const document = ref(null)
-        const concepts = ref(null)
-        const entities = ref(null)
         const error_message = ref(null)
         const server_status = ref(null)
         const user = ref(null)
+        const active_tab = ref(null)
 
 
         // Send message to background.js asking if server is running
@@ -143,10 +130,11 @@ export default {
         //Methods to handle events
         const handleBookmark = async () => {
             doc_status.value = 'loading'
+            error_message.value = null
             let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-
+            active_tab.value = tabs[0]
             chrome.runtime.sendMessage({
-                name: 'bookmark-page', tab: tabs[0]
+                name: 'bookmark-page', tab: active_tab.value
             }).then((response) => {
                 console.log('handleBookmark -> response:', response)
             })
@@ -167,8 +155,9 @@ export default {
         //Regenerate document
         const handleRegenerateDocument = async () => {
             doc_status.value = 'loading'
+            console.log('handleRegenerateDocument -> document title:', document.value.title)
             let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
-                chrome.runtime.sendMessage({
+            chrome.runtime.sendMessage({
                     name: 'regenerate-document', tab: tabs[0], document: document.value
                 }).then((response) => {
                     console.log('handleRegenerateDocument -> response:', response)
@@ -178,7 +167,7 @@ export default {
 
         //Searach chorome storage for bookmarks by url
         const searchBookmarksByUrl = (tab, sidepanelopen) => {
-            doc_status.value = null
+            
             document.value = null
             chrome.storage.local.get(["bookmarks"]).then((value) => {
 
@@ -189,7 +178,7 @@ export default {
                 }
                 const url = cleanUrl(tab.url)
                 console.log('searchBookmarksByUrl -> url:', url)
-                const exist = value.bookmarks[0].find(bookmark => bookmark.url === url)
+                const exist = value.bookmarks.find(bookmark => bookmark.url === url)
 
                 if (exist) {
                     console.log('searchBookmarksByUrl -> bookmark found', exist)
@@ -197,6 +186,7 @@ export default {
                 } else {
                     console.log('searchBookmarksByUrl -> bookmark not found')
                     document.value = null
+                    doc_status.value = 'Placeholder'
                     if(sidepanelopen) {
                         handleBookmark()
                     }
@@ -208,7 +198,8 @@ export default {
         // On sidepanel open, find the current tab and search for bookmarks.
         // If bookmark found, show the document, less create a new bookmark
         chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-            
+
+            active_tab.value = tabs[0]
             const url = cleanUrl(tabs[0].url)
             console.log('Sidepanel -> tabs.query', url)
             searchBookmarksByUrl(url, true)
@@ -220,16 +211,20 @@ export default {
         chrome.tabs.onActivated.addListener(async (activeInfo) => { 
             console.log('Sidepanel -> tabs.onActivated', activeInfo.tabId)
             chrome.tabs.get(activeInfo.tabId).then((tab) => {
+                error_message.value = null
                 console.log('Sidepanel -> tabs.onActivated: ', tab.url)
+                active_tab.value = tab
                 searchBookmarksByUrl(tab)
             })
         });
         // Detect tab refresh
         chrome.tabs.onUpdated.addListener(function (tabId , info) {
             if (info.status === 'complete') {
+                error_message.value = null
                 console.log('Sidepanel -> tabs.onUpdated', tabId)
                 chrome.tabs.get(tabId).then((tab) => {
                     console.log('Sidepanel -> tabs.onUpdated: ', tab.url)
+                    active_tab.value = tab
                     searchBookmarksByUrl(tab)
                 })
             }
@@ -237,14 +232,20 @@ export default {
 
        
         chrome.runtime.onMessage.addListener(
-            function (request, sender, sendResponse) {
+            async (request, sender, sendResponse) => {
                 
                 if (request.name === 'render-document') {
-                    document.value = request.data.document
+
+                    error_message.value = null
+                    document.value = request.data
                     doc_status.value = document.value.status
-                    concepts.value = request.data.concepts
-                    entities.value = request.data.entities
-                    console.log('render document', request.data)
+
+                    if (document.value.url !== cleanUrl(active_tab.value.url)) {
+                        console.log('render document -> document.url !== active_tab.url')
+                        return
+                    }
+
+                    console.log('Render document: ', document.value)
                     sendResponse({ message: 'document recived' })
                 }
                 if (request.name === 'error-bookmarking') {
@@ -256,7 +257,7 @@ export default {
                 }
         }); 
        
-        return { document, concepts, entities, doc_status: doc_status, handleBookmark, handleRegenerateDocument, error_message, server_status, signIn, signOut, user, caspitalFirstLetter}
+        return { document, doc_status: doc_status, handleBookmark, handleRegenerateDocument, error_message, server_status, signIn, signOut, user, caspitalFirstLetter}
 
     }
 }

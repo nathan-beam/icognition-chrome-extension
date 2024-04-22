@@ -6,12 +6,35 @@ const base_url = 'http://localhost:8889'
 const Endpoints = {
     ping: '/ping',
     bookmark: '/bookmark',
-    document: '/document',
+    regenrate: '/document/regenerate',
     document_plus: '/document_plus/{ID}',
     user_bookmarks: '/bookmark/user/{ID}'
 }
 //Global variables to store current page received from content script. 
 let current_page = null
+
+
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
+        
+        // Listen to update to session_user (login) to refresh the bookmarks cache
+        if (key === 'session_user') {
+            console.log("session_user changed: ", newValue.uid)
+            refreshBookmarksCache(newValue.uid)
+
+            chrome.tabs.query({ active: true, lastFocusedWindow: true }, async (tabs) => {
+                console.log('Storage onChanged - Session -> query for active tab -> url: ', tabs[0].url)
+                const bookmark = await searchBookmarksByUrl(tabs[0].url)
+                
+                if (bookmark != undefined) {
+                    renderDocument(bookmark.id)
+                } else {
+                    console.log('Storage onChanged - Session -> bookmark not found')
+                }
+            });
+        }
+    }
+});
 
 async function postBookmark(tab){
     
@@ -40,15 +63,13 @@ async function postBookmark(tab){
         });
 
         if (injectionResults[0].result != null) {
-            console.log('injection results exist')
+            console.log('postBookmark -> HTML recieved from content script')
             html = injectionResults[0].result
         }
     } catch (error) {
         //If error, log error and continue without the html
         console.log('postBookmark error executing script: ', error)
     }
-    
-   
     
 
     try {
@@ -64,9 +85,10 @@ async function postBookmark(tab){
                 user_id: session_user.session_user.uid
             }),
         })
-        console.log('response: ', response)
-        if (response.status == 204) {
-            bm_error = 'Page cannot be bookmarked. Missing article text.'
+        console.log('postBookmark -> response: ', response)
+        if (response.status == 400) {
+            bm_error = await response.json()
+            console.log('postBookmark -> error: ', bm_error)
             return {bookmark, error: bm_error}
         }
         if (response.status == 201) {
@@ -80,12 +102,12 @@ async function postBookmark(tab){
     }
 }
 
-async function postRegenerateDocument(document) {
+async function postRegenerateDocument(document){
 
     console.log('postRegenerateDocument -> document: ', document)
     //Fetch post with request.document
     try {
-        let response = await fetch(`${base_url}${Endpoints.document}`, {
+        let response = await fetch(`${base_url}${Endpoints.regenrate}`, {
             method: 'post',
             headers: {
                 Accept: 'application/json',
@@ -96,8 +118,9 @@ async function postRegenerateDocument(document) {
         
         console.log('postRegenerateDocument -> response: ', response)
         if (response.status == 202) {
-            console.log(`postRegenerateDocument accepted, seding document_ id ${document.id} to renderDocument`)
-            renderDocument(document.id)
+            let bookmark = await response.json()
+            console.log(`postRegenerateDocument accepted, seding bookmark_id ${bookmark.id} to renderDocument`)
+            renderDocument(bookmark.id)
         }
     }catch (err) {
         console.log('postRegenerateDocument -> error: ', err)
@@ -106,13 +129,21 @@ async function postRegenerateDocument(document) {
     
 }
 
+const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
+
 // Source: https://dev.to/ycmjason/javascript-fetch-retry-upon-failure-3p6g
 async function fetch_retry(url, options, n) {
     try {
         const response = await fetch(url, options);
+        console.log('fetch_retry -> attempts: ', n, ' url: ', url)
         if (response.status == 206 && n > 1) {
+            await sleep(1500);
+            console.log('fetch_retry -> retrying attempts: ', n, ' url: ', url)
             return fetch_retry(url, options, n - 1);
-        } else {
+        } else if (response.status == 206 && n == 1) {
+            throw new Error('Failed to fetch: ' + url);
+        }
+        else {
             return response.json();
         }
     } catch (error) {
@@ -120,9 +151,9 @@ async function fetch_retry(url, options, n) {
     }
 }
 
-function refreshBookmarksCache() {
+function refreshBookmarksCache(user_uid) {
     let attempts = 3
-    const url = `${base_url}${Endpoints.user_bookmarks.replace('{ID}', 777)}`
+    const url = `${base_url}${Endpoints.user_bookmarks.replace('{ID}', user_uid)}`
     const options = { method: 'GET', headers: {'Accept': 'application/json','Content-Type': 'application/json',}}
 
     console.log('refreshBookmarksCache -> url: ', url)
@@ -137,7 +168,7 @@ function refreshBookmarksCache() {
     })
 }
 
-function renderDocument(document_id) {
+function renderDocument(bookmark_id) {
     /*
     * Fetch document from server with a retry fetch.
     * The reason for the retry fetch is that the server may not have the document ready while
@@ -145,13 +176,15 @@ function renderDocument(document_id) {
     * Send document to side panel to render. 
     */
     
-    let attempts = 3
-    const url = `${base_url}${Endpoints.document_plus.replace('{ID}', document_id)}`
+    let attempts = 30
+    const url = `${base_url}${Endpoints.document_plus.replace('{ID}', bookmark_id)}`
     const options = { method: 'GET', headers: {'Accept': 'application/json','Content-Type': 'application/json',}}
 
     console.log('renderDocument -> url: ', url)
+    console.time('getDocument')
     fetch_retry(url, options, attempts).then((document) => {
-            console.log('getDocument -> response: ', document)
+        console.log('getDocument -> response: ', document)
+        console.timeEnd('getDocument')
             sendDocumentToSidePanel(document).then((response) => {          
                 console.log('renderDocument -> response: ', response)
             })
@@ -159,7 +192,7 @@ function renderDocument(document_id) {
     })
     .catch((error) => {
         console.log('getDocument -> error: ', error)
-        throw error
+        renderError(error)
     })
 }
 
@@ -192,7 +225,7 @@ async function sendDocumentToSidePanel(document) {
  
 async function storeBookmarks(new_bookmarks) { 
     
-    if (typeof new_bookmarks === 'object') new_bookmarks = [new_bookmarks]
+    if (!Array.isArray(new_bookmarks)) new_bookmarks = [new_bookmarks]
     console.log('storeBookmarks -> new_bookmarks: ', new_bookmarks)
     chrome.storage.local.get(["bookmarks"]).then((value) => {
         let bkmks = value.bookmarks || [];
@@ -203,16 +236,12 @@ async function storeBookmarks(new_bookmarks) {
     });  // chrome.storage.local.set({ 'https://www.thecurrent.com/what-the-tech-open-internet': 'something to store'})
 }
 
-async function getLocalBookmarks() { 
-    chrome.storage.local.get(["bookmarks"]).then((value) => {
-        return value.bookmarks
-    });
-}
 
-function searchBookmarksByUrl(url) {
-    chrome.storage.local.get(["bookmarks"]).then((value) => {
-        return value.bookmarks.find(bookmark => bookmark.url === url);
-    });
+async function searchBookmarksByUrl(url) {
+    const value = await chrome.storage.local.get(["bookmarks"]);
+    if (!value.bookmarks) return undefined
+    const found = value.bookmarks.find(bookmark => bookmark.url == cleanUrl(url));
+    return found
 }
 
 
@@ -222,8 +251,15 @@ chrome.tabs.onActivated.addListener(async (tab) => {
     console.log('tabs.onActivated', tab.tabId)
     const { path } = await chrome.sidePanel.getOptions({ tabId: tab.tabId });
     console.log('tabs.onActivated -> sidepanel exists: ', path)
-    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, async (tabs) => {
         console.log('tabs onActivated -> query for active tab -> url: ', tabs[0].url)
+        const bookmark = await searchBookmarksByUrl(tabs[0].url)
+        if (bookmark != undefined) {
+            console.log('tabs.onActivated -> found: ', bookmark)
+            renderDocument(bookmark.id)
+        } else {
+            console.log('tabs.onActivated -> bookmark not found')
+        }
     });
 });
 
@@ -262,6 +298,7 @@ chrome.runtime.onMessage.addListener(
             console.log('background.js got message. Side Panel Opened')
             
             console.log('tabs url: ', request.tab.url)
+            console.time('postBookmark')
             postBookmark(request.tab).then((result) => {
                 if (result.error) {
                     console.log('onMessage.bookmark-page error: ', result.error)
@@ -269,7 +306,8 @@ chrome.runtime.onMessage.addListener(
                 } else if (!result.error) {
                     storeBookmarks(result.bookmark)
                     console.log('onMessage.bookmark-page url: ', result.bookmark.url)
-                    renderDocument(result.bookmark.document_id)
+                    console.timeEnd('postBookmark')
+                    renderDocument(result.bookmark.id)
     
                 } else {
                     console.log('error: ', result)
@@ -283,8 +321,8 @@ chrome.runtime.onMessage.addListener(
         }
 
         if (request.name === 'request-document') {
-            console.log('background.js got message. Request Document')
-            renderDocument(request.bookmark.document_id)
+            console.log('background.js got message. Request Document. Bookmark ID: ', request.bookmark.id)
+            renderDocument(request.bookmark.id)
         }
     });
 
@@ -301,7 +339,6 @@ chrome.runtime.onInstalled.addListener(() => {
         if (error) {
             console.error(error);
         }
-        refreshBookmarksCache()
     });
     
 
