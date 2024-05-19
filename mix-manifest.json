@@ -1,14 +1,14 @@
 {
     "/dist/js/background.js": "/dist/js/background.js",
     "/dist/js/utils.js": "/dist/js/utils.js",
-    "/dist/js/sidepanel.js": "/dist/js/sidepanel.js",
-    "/dist/css/sidepanel.css": "/dist/css/sidepanel.css",
+    "/dist/js/popup.js": "/dist/js/popup.js",
+    "/dist/css/popup.css": "/dist/css/popup.css",
     "/dist/images/icog_action_icon_128x128.png": "/dist/images/icog_action_icon_128x128.png",
     "/dist/images/icog_action_icon_16x16.png": "/dist/images/icog_action_icon_16x16.png",
     "/dist/images/icog_action_icon_32x32.png": "/dist/images/icog_action_icon_32x32.png",
     "/dist/images/icog_logo.png": "/dist/images/icog_logo.png",
     "/dist/images/icognition_logo_sidepanel.png": "/dist/images/icognition_logo_sidepanel.png",
     "/dist/images/icons8-logout-48.png": "/dist/images/icons8-logout-48.png",
-    "/dist/sidepanel.html": "/dist/sidepanel.html",
+    "/dist/popup.html": "/dist/popup.html",
     "/dist/manifest.json": "/dist/manifest.json"
 }

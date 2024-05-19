@@ -1,4 +1,4 @@
-const base_url = 'http://localhost:8889'
+const base_url = 'https://icognition-api-scv-mheo5yycwa-uc.a.run.app'  //'http://localhost:8889'
 
 const Endpoints = {
     bookmark: '/bookmark',

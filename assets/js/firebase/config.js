@@ -4,12 +4,13 @@ import { getAuth, signOut, GoogleAuthProvider, signInWithCredential } from 'fire
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyDNAL2iRK_otPM5dQfHA1lr_1EKEeq4ifo",
-    authDomain: "strange-tome-412113.firebaseapp.com",
-    projectId: "strange-tome-412113",
-    storageBucket: "strange-tome-412113.appspot.com",
-    messagingSenderId: "458477770208",
-    appId: "1:458477770208:web:cf43ba4d23eb6c91d54785"
+    apiKey: "AIzaSyAA1hrqYpKC6jcrjDyPtwKlDDpwDg4WM_U",
+    authDomain: "icognition-app.firebaseapp.com",
+    projectId: "icognition-app",
+    storageBucket: "icognition-app.appspot.com",
+    messagingSenderId: "1022378307371",
+    appId: "1:1022378307371:web:43a550bd3efad3ea7f9f6e",
+    measurementId: "G-M1H60J2J4T"
 };
 
 const firebase = initializeApp(firebaseConfig);
