@@ -7,8 +7,10 @@ const user = ref(null)
 
 // Handle user signin
 const handleSignIn = (e) => {
+    
     e.preventDefault()
     console.log('before signed in user -> ', auth.currentUser)
+    
     chrome.identity.getAuthToken({ interactive: true }, token => {
         if ( chrome.runtime.lastError || ! token ) {
             console.log(`SSO ended with an error: ${JSON.stringify(chrome.runtime.lastError)}`)
@@ -19,6 +21,7 @@ const handleSignIn = (e) => {
                 user.value = auth.currentUser
                 auth_error.value = null
                 console.log('signed in user -> ', auth.currentUser)
+                chrome.storage.session.remove('session_user')
                 chrome.storage.session.set({ session_user: auth.currentUser }).then(() => {
                     console.log("signIn => authproof saved!");
                 });
@@ -31,6 +34,7 @@ const handleSignOut = () => {
     
     auth.signOut().then(() => {
         console.log('signed out! user: ', auth.currentUser)
+        chrome.storage.session.remove('session_user')
         user.value = null
     }).catch((error) => {
     console.error('error signing out: ', error)

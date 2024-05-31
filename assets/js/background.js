@@ -1,5 +1,4 @@
 import { cleanUrl } from './utils.js'
-import { firebase } from './firebase/config'
 
 const base_url = process.env.MIX_BASE_URL // 'https://icognition-api-scv-mheo5yycwa-uc.a.run.app' //'http://localhost:8889'
 console.log('base_url: ', base_url)
@@ -12,21 +11,26 @@ const Endpoints = {
     user_bookmarks: '/bookmarks/user/{ID}',
     user_bookmark: '/bookmark/user'
 }
-//Global variables to store current page received from content script. 
-let current_page = null
 
-
+// Listen to changes in storage and if session_user changes, refresh the bookmarks cache, or delete the cache if the user logs out
 chrome.storage.onChanged.addListener((changes, namespace) => {
     for (let [key, { oldValue, newValue }] of Object.entries(changes)) {
         
         // Listen to update to session_user (login) to refresh the bookmarks cache
         if (key === 'session_user') {
-            console.log("session_user changed: ", newValue.uid)
-            refreshBookmarksCache(newValue.uid)
+
+            if (newValue === undefined) {
+                console.log("Detected user logout: ", newValue)
+                chrome.storage.local.remove('bookmarks')
+            } else if (newValue !== undefined && oldValue === undefined) {
+                console.log("Detected user login: ", newValue)
+                refreshBookmarksCache(newValue.uid)
+            }
         }
     }
 });
 
+// Create a bookmark
 async function postBookmark(tab){
     
     let bookmark = null
@@ -76,23 +80,15 @@ async function postBookmark(tab){
                 user_id: session_user.session_user.uid
             }),
         })
-        console.log('postBookmark -> response: ', response)
-        if (response.status == 400) {
-            bm_error = await response.json()
-            console.log('postBookmark -> error: ', bm_error)
-            return {bookmark, error: bm_error}
-        }
-        if (response.status == 201) {
-            const bookmark = await response.json()
-            return {bookmark, error: null}
-        }
+        const _content = await response.json()
+        return { status: response.status, content: _content }
     }
     catch (err) {
-        const bm_error = err
-        return {bookmark, error: bm_error}
+        return {status: 500, content: err}
     }
 }
 
+// Regenerate a document (this is used when the document failed to generate on the first attempt)
 async function postRegenerateDocument(document){
 
     console.log('postRegenerateDocument -> document: ', document)
@@ -156,15 +152,16 @@ const searchServerBookmarksByUrl = async (user_id, url) => {
                 user_id: user_id
             }),
         })
-        console.log('search bookmark -> response: ', response)
+        console.log('searchServerBookmarkByUrl -> response: ', response)
         if (response.status == 404) {
             const bm_error = await response.json()
-            console.log('postBookmark -> error: ', bm_error)
-            return { bookmark, error: bm_error }
+            console.log('searchServerBookmarkByUrl -> error: ', bm_error)
+            return { bookmark: undefined, error: bm_error }
         }
         if (response.status == 200) {
-            const bookmark = await response.json()
-            return { bookmark, error: null }
+            const _bookmark = await response.json()
+            console.log('searchServerBookmarkByUrl -> success: ', bookmark)
+            return { bookmark: _bookmark, error: null }
         }
     }
     catch (err) {
@@ -180,13 +177,13 @@ function refreshBookmarksCache(user_uid) {
     const url = `${base_url}${Endpoints.user_bookmarks.replace('{ID}', user_uid)}`
     const options = { method: 'GET', headers: {'Accept': 'application/json','Content-Type': 'application/json',}}
 
-    console.log('refreshBookmarksCache -> url: ', url)
-    fetch_retry(url, options, attempts)
-        .then((bookmarks) => {
+    fetch_retry(url, options, attempts).then(async (bookmarks) => {
         console.log('refreshBookmarksCache -> response: ', bookmarks)
+
+        //Clear the local storage before storing the bookmarks
+        await chrome.storage.local.clear()
         storeBookmarks(bookmarks)
-    })
-    .catch((error) => {
+    }).catch((error) => {
         console.log('refreshBookmarksCache -> error: ', error)
         throw error
     })
@@ -206,13 +203,17 @@ const fetchDocument = async (bookmark_id) => {
     }
 
 }
+
+
+// Listen from popup to fetch document
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.name === 'fetch-document') {
         console.log('background.js got message. Fetch Document for bookmark_id: ', request.bookmark_id)
         fetchDocument(request.bookmark_id).then((doc) => {
-            console.log('fetchDocument 1 -> response: ', doc)
+            console.log('fetchDocument -> response: ', doc)
             sendResponse({ document: doc })
         })
+        return true
     }
 
 })
@@ -276,7 +277,7 @@ async function sendDocumentToSidePanel(document) {
 async function storeBookmarks(new_bookmarks) { 
     
     if (!Array.isArray(new_bookmarks)) new_bookmarks = [new_bookmarks]
-    console.log('storeBookmarks -> new_bookmarks: ', new_bookmarks)
+    
     chrome.storage.local.get(["bookmarks"]).then((value) => {
         let bkmks = value.bookmarks || [];
         bkmks = Array.from(new Set([...bkmks, ...new_bookmarks]));
@@ -287,12 +288,18 @@ async function storeBookmarks(new_bookmarks) {
 }
 
 
+
+
 async function searchBookmarksByUrl(url) {
+
+    const session_user = await chrome.storage.session.get(["session_user"])
+    if (!session_user.session_user) return console.log('searchBookmarksByUrl -> user not authenticated')
+
+    console.log('searchBookmarksByUrl -> user: ', session_user)
     const value = await chrome.storage.local.get(["bookmarks"]);
     console.log('searchBookmarksByUrl -> value: ', value)
-    if (!value.bookmarks && session_user != undefined) {
+    if (!value.bookmarks) {
         console.log('searchBookmarksByUrl -> no bookmarks found in local storage, calling server')
-        const session_user = await chrome.storage.session.get(["session_user"])
         const bookmark = await searchServerBookmarksByUrl(session_user.session_user.uid, url)
         return bookmark
     } else {
@@ -309,7 +316,8 @@ const badgeOn = (tabId) => {
     chrome.action.setBadgeText({ text: '✔' , tabId: tabId });
 }
 
-const badgeOff = (tabId) => {     
+const badgeOff = (tabId) => {
+    console.log('badgeOff -> tabId: ', tabId)
     chrome.action.setBadgeText({ text: null , tabId: tabId });
 }
 
@@ -318,10 +326,10 @@ const badgeToggle = async (tab) => {
     console.log('badgeToggle -> url: ', tab.url)
     const bookmark = await searchBookmarksByUrl(tab.url)
     if (bookmark != undefined) {
-        console.log('tabs.onActivated -> found: ', bookmark)
+        console.log('badgeToggle -> bookmark found: ', bookmark)
         badgeOn(tab.tabId)
     } else {
-        console.log('tabs.onActivated -> bookmark not found')
+        console.log('badgeToggle -> bookmark not found')
         badgeOff(tab.tabId)
     }
 }
@@ -358,14 +366,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('background.js got message. Server is')
         fetch_retry(`${base_url}/ping`, { method: 'GET', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', } }, 3)
             .then((response) => {
+                console.log('background.js got message. Server response: ', response)
                 sendResponse({ status: 'up' })
 
             }).catch((error) => {
+                console.log('background.js got message. Server error: ', error)
                 sendResponse({ status: 'down' })
             })
-
+        return true
     }
-    return true
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -393,29 +402,13 @@ chrome.runtime.onMessage.addListener(
             console.log('background.js got message. Bookmark Page for url: ', request.tab.url)
                 
                 postBookmark(request.tab).then((result) => {
-                    if (result.error) {
-
-                        console.log('onMessage.bookmark-page error: ', result.error)
-                        sendResponse({ error: result.error })
                     
-                    } else if (!result.error) {
-
-                        storeBookmarks(result.bookmark)
-                        console.log('onMessage.bookmark-page url: ', result.bookmark.url)
-                        badgeOn(request.tab.id)
-                        sendResponse({ bookmark: result.bookmark })
-                        
-                    } else {
-                        console.log('error: ', result)
-                    }
+                    console.log('background.js postBookmark Results: ', result.status, ' -> ', result.content)
+                    sendResponse({ status: result.status , content: result.content })
                 })
-            
+            return true            
         }
 
-        if (request.name === 'regenerate-document') {
-            console.log('background.js got message. Regenerate Document')
-            postRegenerateDocument(request.document)
-        }
     });
 
 
